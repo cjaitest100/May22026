@@ -43,7 +43,7 @@
     </div>
     <div class="legend">
       <b>How to play:</b> Each turn, place your mark on an empty sticker, then choose a cube rotation. Get 3 in a row on any face to win &mdash; but only if it survives your forced rotation.<br><br>
-      <b>Drag</b> the cube to inspect all sides.
+      <b>Drag</b> the cube to inspect all sides. Hover a button to preview the rotation.
     </div>
   </div>
 </div>
@@ -55,21 +55,19 @@ const OrbitControls = THREE.OrbitControls;
 
 /* =========================================================
  * Coordinate / sticker helpers
- *
  * Face indices: 0=U(+Y), 1=D(-Y), 2=F(+Z), 3=B(-Z), 4=L(-X), 5=R(+X)
- * Sticker index = face*9 + row*3 + col, with each face's row/col
- * read in a fixed orientation when viewed from outside the cube.
+ * Sticker index = face*9 + row*3 + col
  * ========================================================= */
 
 function stickerToCubie(face, row, col) {
   let x = 0, y = 0, z = 0, nx = 0, ny = 0, nz = 0;
   switch (face) {
-    case 0: ny = 1;  x = col - 1;     y = 1;            z = row - 1;    break; // U
-    case 1: ny = -1; x = col - 1;     y = -1;           z = 1 - row;    break; // D
-    case 2: nz = 1;  x = col - 1;     y = 1 - row;      z = 1;          break; // F
-    case 3: nz = -1; x = 1 - col;     y = 1 - row;      z = -1;         break; // B
-    case 4: nx = -1; x = -1;          y = 1 - row;      z = col - 1;    break; // L
-    case 5: nx = 1;  x = 1;           y = 1 - row;      z = 1 - col;    break; // R
+    case 0: ny = 1;  x = col - 1; y = 1;       z = row - 1; break;
+    case 1: ny = -1; x = col - 1; y = -1;      z = 1 - row; break;
+    case 2: nz = 1;  x = col - 1; y = 1 - row; z = 1;       break;
+    case 3: nz = -1; x = 1 - col; y = 1 - row; z = -1;      break;
+    case 4: nx = -1; x = -1;      y = 1 - row; z = col - 1; break;
+    case 5: nx = 1;  x = 1;       y = 1 - row; z = 1 - col; break;
   }
   return { x, y, z, nx, ny, nz };
 }
@@ -84,26 +82,22 @@ function cubieToSticker(x, y, z, nx, ny, nz) {
   else face = 5;
   let row, col;
   switch (face) {
-    case 0: row = z + 1;  col = x + 1;  break;
-    case 1: row = 1 - z;  col = x + 1;  break;
-    case 2: row = 1 - y;  col = x + 1;  break;
-    case 3: row = 1 - y;  col = 1 - x;  break;
-    case 4: row = 1 - y;  col = z + 1;  break;
-    case 5: row = 1 - y;  col = 1 - z;  break;
+    case 0: row = z + 1;  col = x + 1; break;
+    case 1: row = 1 - z;  col = x + 1; break;
+    case 2: row = 1 - y;  col = x + 1; break;
+    case 3: row = 1 - y;  col = 1 - x; break;
+    case 4: row = 1 - y;  col = z + 1; break;
+    case 5: row = 1 - y;  col = 1 - z; break;
   }
   return { face, row, col };
 }
 
-/* Rotate a vector by sign*90deg about the given axis. */
 function rotPos(axis, sign, x, y, z) {
   if (axis === 'x') return [x, -sign * z, sign * y];
   if (axis === 'y') return [sign * z, y, -sign * x];
   return [-sign * y, sign * x, z];
 }
 
-/* Per-face rotation defs. cwSign is the rotation sign about the
- * positive axis that produces a clockwise visual turn from outside
- * the cube. */
 const FACE_DEFS = {
   U: { axis: 'y', layer: +1, cwSign: -1 },
   D: { axis: 'y', layer: -1, cwSign: +1 },
@@ -113,13 +107,11 @@ const FACE_DEFS = {
   R: { axis: 'x', layer: +1, cwSign: -1 },
 };
 
-/* Build a permutation array `perm` such that newState[i] = oldState[perm[i]] */
 function buildPerm(faceLetter, prime) {
   const def = FACE_DEFS[faceLetter];
   const sign = (prime ? -1 : 1) * def.cwSign;
   const perm = new Array(54);
   for (let i = 0; i < 54; i++) perm[i] = i;
-
   for (let f = 0; f < 6; f++) {
     for (let r = 0; r < 3; r++) {
       for (let c = 0; c < 3; c++) {
@@ -129,9 +121,7 @@ function buildPerm(faceLetter, prime) {
         const [nx, ny, nz] = rotPos(def.axis, sign, sc.x, sc.y, sc.z);
         const [nnx, nny, nnz] = rotPos(def.axis, sign, sc.nx, sc.ny, sc.nz);
         const dest = cubieToSticker(nx, ny, nz, nnx, nny, nnz);
-        const srcIdx = f * 9 + r * 3 + c;
-        const dstIdx = dest.face * 9 + dest.row * 3 + dest.col;
-        perm[dstIdx] = srcIdx;
+        perm[dest.face * 9 + dest.row * 3 + dest.col] = f * 9 + r * 3 + c;
       }
     }
   }
@@ -140,11 +130,7 @@ function buildPerm(faceLetter, prime) {
 
 const MOVE_NAMES = ["U", "U'", "D", "D'", "F", "F'", "B", "B'", "L", "L'", "R", "R'"];
 const PERMS = {};
-for (const m of MOVE_NAMES) {
-  const prime = m.endsWith("'");
-  const f = m[0];
-  PERMS[m] = buildPerm(f, prime);
-}
+for (const m of MOVE_NAMES) PERMS[m] = buildPerm(m[0], m.endsWith("'"));
 
 function applyPerm(state, perm) {
   const next = new Int8Array(54);
@@ -152,22 +138,15 @@ function applyPerm(state, perm) {
   return next;
 }
 
-/* Self-test: every move applied 4 times to a solved state must return solved. */
 (function selfTest() {
   for (const m of MOVE_NAMES) {
     let s = new Int8Array(54);
     for (let i = 0; i < 54; i++) s[i] = i;
-    const p = PERMS[m];
     let s2 = s;
-    for (let k = 0; k < 4; k++) s2 = applyPerm(s2, p);
-    for (let i = 0; i < 54; i++) {
-      if (s2[i] !== s[i]) {
-        console.error('Self-test failed for move', m, 'at index', i);
-        return;
-      }
-    }
+    for (let k = 0; k < 4; k++) s2 = applyPerm(s2, PERMS[m]);
+    for (let i = 0; i < 54; i++) if (s2[i] !== s[i]) { console.error('Self-test failed', m, i); return; }
   }
-  console.log('Cube move self-test: OK (all 12 moves)');
+  console.log('Move self-test: OK');
 })();
 
 /* =========================================================
@@ -207,10 +186,8 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.12;
 controls.rotateSpeed = 0.85;
 
-/* Build cubies + stickers */
-const cubieMaterial = new THREE.MeshLambertMaterial({ color: 0x111111 });
+/* Build cubies — each gets its own material so emissive can be set per-cubie */
 const cubieGeometry = new THREE.BoxGeometry(0.95, 0.95, 0.95);
-
 const cubies = [];
 const cubieMap = new Map();
 const cubieKey = (x, y, z) => `${x},${y},${z}`;
@@ -219,7 +196,8 @@ for (let x = -1; x <= 1; x++) {
   for (let y = -1; y <= 1; y++) {
     for (let z = -1; z <= 1; z++) {
       if (x === 0 && y === 0 && z === 0) continue;
-      const m = new THREE.Mesh(cubieGeometry, cubieMaterial);
+      const mat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+      const m = new THREE.Mesh(cubieGeometry, mat);
       m.position.set(x, y, z);
       m.userData.initialPosition = new THREE.Vector3(x, y, z);
       scene.add(m);
@@ -258,8 +236,7 @@ function drawSticker(value) {
     ctx.textBaseline = 'middle';
     ctx.fillText(value === 1 ? 'X' : 'O', STICKER_SIZE / 2, STICKER_SIZE / 2 + 4);
   }
-  const tex = new THREE.CanvasTexture(canvas);
-  return tex;
+  return new THREE.CanvasTexture(canvas);
 }
 
 const STICKER_OFFSET = 0.476;
@@ -274,11 +251,8 @@ function buildStickers() {
         const cubie = cubieMap.get(cubieKey(sc.x, sc.y, sc.z));
         const mat = new THREE.MeshBasicMaterial({ map: drawSticker(0), side: THREE.FrontSide });
         const mesh = new THREE.Mesh(stickerGeometry, mat);
-        // Local position relative to cubie (cubie is at integer coords; stickers offset by STICKER_OFFSET along normal)
         mesh.position.set(sc.nx * STICKER_OFFSET, sc.ny * STICKER_OFFSET, sc.nz * STICKER_OFFSET);
-        // Orient the plane so its +Z normal points along the sticker normal
-        const normal = new THREE.Vector3(sc.nx, sc.ny, sc.nz);
-        mesh.lookAt(mesh.position.clone().add(normal));
+        mesh.lookAt(mesh.position.clone().add(new THREE.Vector3(sc.nx, sc.ny, sc.nz)));
         mesh.userData.isSticker = true;
         cubie.add(mesh);
         allStickerMeshes.push(mesh);
@@ -292,18 +266,16 @@ buildStickers();
  * Game state
  * ========================================================= */
 
-let cubeState = new Int8Array(54); // 0 empty, 1 X, 2 O
+let cubeState = new Int8Array(54);
 let currentPlayer = 1;
-let gamePhase = 'MARK_PHASE'; // MARK_PHASE | MOVE_PHASE | ANIMATING | GAME_OVER
+let gamePhase = 'MARK_PHASE';
 let winner = 0;
 
-/* Map a sticker mesh to its current logical sticker index based on world transform. */
 const _v = new THREE.Vector3();
 const _n = new THREE.Vector3();
 function meshToLogicalIndex(mesh) {
   mesh.updateWorldMatrix(true, false);
   mesh.getWorldPosition(_v);
-  // World normal = local +Z transformed by world matrix (rotation only)
   _n.set(0, 0, 1).transformDirection(mesh.matrixWorld);
   const ax = Math.abs(_n.x), ay = Math.abs(_n.y), az = Math.abs(_n.z);
   let nx = 0, ny = 0, nz = 0;
@@ -320,33 +292,119 @@ function meshToLogicalIndex(mesh) {
 function refreshAllTextures() {
   for (const mesh of allStickerMeshes) {
     const idx = meshToLogicalIndex(mesh);
-    const value = cubeState[idx];
     if (mesh.material.map) mesh.material.map.dispose();
-    mesh.material.map = drawSticker(value);
+    mesh.material.map = drawSticker(cubeState[idx]);
     mesh.material.needsUpdate = true;
   }
 }
 refreshAllTextures();
 
 /* =========================================================
- * Input: click-to-mark with drag detection
+ * Layer glow + rotation arrow
+ * ========================================================= */
+
+function getLayerCubies(faceLetter) {
+  const def = FACE_DEFS[faceLetter];
+  return cubies.filter(c => {
+    const v = def.axis === 'x' ? c.position.x : def.axis === 'y' ? c.position.y : c.position.z;
+    return Math.round(v) === def.layer;
+  });
+}
+
+function setLayerGlow(faceLetter, on) {
+  for (const c of getLayerCubies(faceLetter)) {
+    c.material.emissive.set(on ? 0xffaa00 : 0x000000);
+    c.material.emissiveIntensity = on ? 0.55 : 0;
+  }
+}
+
+function clearAllGlow() {
+  for (const c of cubies) {
+    c.material.emissive.set(0x000000);
+    c.material.emissiveIntensity = 0;
+  }
+}
+
+let arrowGroup = null;
+
+function createMoveArrow(moveName) {
+  removeMoveArrow();
+  const prime = moveName.endsWith("'");
+  const faceLetter = moveName[0];
+  const def = FACE_DEFS[faceLetter];
+  const sign = (prime ? -1 : 1) * def.cwSign;
+  // arcDir: which direction the arc travels through its parameterisation
+  // Y-axis is opposite sign to X/Z due to coordinate handedness
+  const arcDir = def.axis === 'y' ? -sign : sign;
+
+  const radius = 1.85;
+  const arcFraction = 0.78; // ~280° of arc shown
+  const numSeg = 60;
+  const points = [];
+  for (let i = 0; i <= numSeg; i++) {
+    const a = arcDir * (i / numSeg) * arcFraction * Math.PI * 2;
+    if (def.axis === 'y')      points.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius));
+    else if (def.axis === 'z') points.push(new THREE.Vector3(Math.cos(a) * radius, Math.sin(a) * radius, 0));
+    else                       points.push(new THREE.Vector3(0, Math.cos(a) * radius, Math.sin(a) * radius));
+  }
+
+  const group = new THREE.Group();
+  const ARROW_COLOR = 0xffcc00;
+
+  // Tube arc — thick enough to be clearly visible
+  const curve = new THREE.CatmullRomCurve3(points);
+  const tubeGeo = new THREE.TubeGeometry(curve, numSeg, 0.06, 7, false);
+  group.add(new THREE.Mesh(tubeGeo, new THREE.MeshBasicMaterial({ color: ARROW_COLOR })));
+
+  // Arrowhead cone at the tip
+  const tip = points[points.length - 1];
+  const prev = points[points.length - 5];
+  const dir = new THREE.Vector3().subVectors(tip, prev).normalize();
+  const cone = new THREE.Mesh(
+    new THREE.ConeGeometry(0.15, 0.42, 8),
+    new THREE.MeshBasicMaterial({ color: ARROW_COLOR })
+  );
+  cone.position.copy(tip);
+  cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+  group.add(cone);
+
+  // Position the ring just outside the rotating layer
+  const offset = def.layer * 2.05;
+  if (def.axis === 'y')      group.position.set(0, offset, 0);
+  else if (def.axis === 'z') group.position.set(0, 0, offset);
+  else                       group.position.set(offset, 0, 0);
+
+  scene.add(group);
+  arrowGroup = group;
+}
+
+function removeMoveArrow() {
+  if (!arrowGroup) return;
+  arrowGroup.traverse(obj => {
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) obj.material.dispose();
+  });
+  scene.remove(arrowGroup);
+  arrowGroup = null;
+}
+
+/* =========================================================
+ * Input: click-to-mark
  * ========================================================= */
 
 const raycaster = new THREE.Raycaster();
 const mouseNDC = new THREE.Vector2();
 let mouseDownAt = null;
 
-renderer.domElement.addEventListener('pointerdown', (e) => {
+renderer.domElement.addEventListener('pointerdown', e => {
   mouseDownAt = { x: e.clientX, y: e.clientY };
 });
-renderer.domElement.addEventListener('pointerup', (e) => {
+renderer.domElement.addEventListener('pointerup', e => {
   if (!mouseDownAt) return;
-  const dx = e.clientX - mouseDownAt.x;
-  const dy = e.clientY - mouseDownAt.y;
+  const dx = e.clientX - mouseDownAt.x, dy = e.clientY - mouseDownAt.y;
   mouseDownAt = null;
-  if (Math.hypot(dx, dy) > 4) return; // it was a drag
+  if (Math.hypot(dx, dy) > 4) return;
   if (gamePhase !== 'MARK_PHASE') return;
-
   const rect = renderer.domElement.getBoundingClientRect();
   mouseNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   mouseNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -357,7 +415,6 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   const idx = meshToLogicalIndex(mesh);
   if (cubeState[idx] !== 0) return;
   cubeState[idx] = currentPlayer;
-  // Redraw just this sticker
   if (mesh.material.map) mesh.material.map.dispose();
   mesh.material.map = drawSticker(currentPlayer);
   mesh.material.needsUpdate = true;
@@ -366,42 +423,32 @@ renderer.domElement.addEventListener('pointerup', (e) => {
 });
 
 /* =========================================================
- * Move animation (pivot technique) + state permutation
+ * Move animation + state permutation
  * ========================================================= */
-
-function getLayerCubies(faceLetter) {
-  const def = FACE_DEFS[faceLetter];
-  return cubies.filter((c) => {
-    const v = def.axis === 'x' ? c.position.x : def.axis === 'y' ? c.position.y : c.position.z;
-    return Math.round(v) === def.layer;
-  });
-}
 
 function easeInOut(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
 
 function animateMove(moveName, onComplete) {
-  const faceLetter = moveName[0];
   const prime = moveName.endsWith("'");
+  const faceLetter = moveName[0];
   const def = FACE_DEFS[faceLetter];
   const sign = (prime ? -1 : 1) * def.cwSign;
   const targetAngle = sign * Math.PI / 2;
-  const axis = def.axis;
 
   const pivot = new THREE.Object3D();
   scene.add(pivot);
   const moving = getLayerCubies(faceLetter);
   for (const c of moving) pivot.attach(c);
 
-  const duration = 320;
+  const duration = 340;
   const startTime = performance.now();
   function tick(now) {
     const t = Math.min((now - startTime) / duration, 1);
-    const eased = easeInOut(t);
-    pivot.rotation[axis] = eased * targetAngle;
+    pivot.rotation[def.axis] = easeInOut(t) * targetAngle;
     if (t < 1) {
       requestAnimationFrame(tick);
     } else {
-      pivot.rotation[axis] = targetAngle;
+      pivot.rotation[def.axis] = targetAngle;
       pivot.updateMatrixWorld(true);
       for (const c of moving) {
         scene.attach(c);
@@ -418,18 +465,20 @@ function performMove(moveName) {
   if (gamePhase !== 'MOVE_PHASE') return;
   gamePhase = 'ANIMATING';
   controls.enabled = false;
+  createMoveArrow(moveName);
+  setLayerGlow(moveName[0], true);
   updateUI();
   animateMove(moveName, () => {
     cubeState = applyPerm(cubeState, PERMS[moveName]);
     refreshAllTextures();
+    setLayerGlow(moveName[0], false);
+    removeMoveArrow();
     controls.enabled = true;
     const w = checkVictory();
     if (w !== 0) {
-      winner = w;
-      gamePhase = 'GAME_OVER';
-    } else if (cubeState.every((v) => v !== 0)) {
-      winner = 0;
-      gamePhase = 'GAME_OVER';
+      winner = w; gamePhase = 'GAME_OVER';
+    } else if (cubeState.every(v => v !== 0)) {
+      winner = 0; gamePhase = 'GAME_OVER';
     } else {
       currentPlayer = currentPlayer === 1 ? 2 : 1;
       gamePhase = 'MARK_PHASE';
@@ -442,16 +491,12 @@ function performMove(moveName) {
  * Win detection
  * ========================================================= */
 
-const WIN_LINES = [
-  [0,1,2],[3,4,5],[6,7,8],
-  [0,3,6],[1,4,7],[2,5,8],
-  [0,4,8],[2,4,6],
-];
+const WIN_LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 function checkVictory() {
   for (let f = 0; f < 6; f++) {
     const base = f * 9;
     for (const [a, b, c] of WIN_LINES) {
-      const va = cubeState[base + a], vb = cubeState[base + b], vc = cubeState[base + c];
+      const va = cubeState[base+a], vb = cubeState[base+b], vc = cubeState[base+c];
       if (va !== 0 && va === vb && vb === vc) return va;
     }
   }
@@ -468,6 +513,19 @@ for (const m of MOVE_NAMES) {
   btn.className = 'move-btn';
   btn.textContent = m;
   btn.addEventListener('click', () => performMove(m));
+  // Desktop hover preview
+  btn.addEventListener('mouseenter', () => {
+    if (gamePhase === 'MOVE_PHASE') {
+      createMoveArrow(m);
+      setLayerGlow(m[0], true);
+    }
+  });
+  btn.addEventListener('mouseleave', () => {
+    if (gamePhase !== 'ANIMATING') {
+      removeMoveArrow();
+      clearAllGlow();
+    }
+  });
   moveButtonsContainer.appendChild(btn);
 }
 const moveButtons = Array.from(moveButtonsContainer.querySelectorAll('.move-btn'));
@@ -485,13 +543,11 @@ function updateUI() {
     playerEl.textContent = '';
     phaseEl.textContent = '';
     winPanel.classList.add('show');
-    winMessage.textContent = winner === 0
-      ? "Draw!"
-      : `Player ${winner} (${winner === 1 ? 'X' : 'O'}) wins!`;
+    winMessage.textContent = winner === 0 ? "Draw!" : `Player ${winner} (${winner === 1 ? 'X' : 'O'}) wins!`;
   } else {
     playerEl.textContent = `Player ${currentPlayer} (${currentPlayer === 1 ? 'X' : 'O'})`;
     if (gamePhase === 'MARK_PHASE') phaseEl.textContent = 'Click any empty sticker to place your mark.';
-    else if (gamePhase === 'MOVE_PHASE') phaseEl.textContent = 'Now choose a Rubik’s Cube rotation.';
+    else if (gamePhase === 'MOVE_PHASE') phaseEl.textContent = "Choose a rotation — hover to preview.";
     else phaseEl.textContent = 'Rotating…';
     winPanel.classList.remove('show');
   }
@@ -499,6 +555,8 @@ function updateUI() {
 }
 
 restartBtn.addEventListener('click', () => {
+  removeMoveArrow();
+  clearAllGlow();
   cubeState = new Int8Array(54);
   currentPlayer = 1;
   winner = 0;
