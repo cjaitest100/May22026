@@ -48,17 +48,10 @@
   </div>
 </div>
 
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-  }
-}
-</script>
-<script type="module">
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const OrbitControls = THREE.OrbitControls;
 
 /* =========================================================
  * Coordinate / sticker helpers
@@ -266,7 +259,6 @@ function drawSticker(value) {
     ctx.fillText(value === 1 ? 'X' : 'O', STICKER_SIZE / 2, STICKER_SIZE / 2 + 4);
   }
   const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
 
